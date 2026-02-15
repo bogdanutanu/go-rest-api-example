@@ -1,4 +1,4 @@
-module github.com/rameshsunkara/go-rest-api-example
+module github.com/bogdanutanu/go-rest-api-example
 
 go 1.25.4
 
