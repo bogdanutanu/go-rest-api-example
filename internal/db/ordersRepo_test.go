@@ -91,7 +91,7 @@ func TestValidate(t *testing.T) {
 		{
 			name: "GetAll with invalid initialization",
 			testFunc: func() error {
-				_, gErr := ds.GetAll(context.Background(), 10)
+				_, gErr := ds.GetAll(context.Background(), 0, 10)
 				return gErr
 			},
 			wantErr: db.ErrInvalidInitialization,
@@ -424,13 +424,15 @@ func TestOrdersRepoGetAll(t *testing.T) {
 	tests := []struct {
 		name    string
 		limit   int64
+		offset  int64
 		mock    func(mt *mtest.T)
 		wantErr error
 		wantLen int
 	}{
 		{
-			name:  "Success",
-			limit: 10,
+			name:   "Success",
+			limit:  10,
+			offset: 0,
 			mock: func(mt *mtest.T) {
 				find := mtest.CreateCursorResponse(1, oCollName, mtest.FirstBatch, bson.D{
 					{Key: "_id", Value: primitive.NewObjectID()},
@@ -443,8 +445,24 @@ func TestOrdersRepoGetAll(t *testing.T) {
 			wantLen: 1,
 		},
 		{
-			name:  "NoData",
-			limit: 10,
+			name:   "SuccessWithOffset",
+			limit:  10,
+			offset: 20,
+			mock: func(mt *mtest.T) {
+				find := mtest.CreateCursorResponse(1, oCollName, mtest.FirstBatch, bson.D{
+					{Key: "_id", Value: primitive.NewObjectID()},
+					{Key: "user", Value: "test@example.com"},
+				})
+				killCursors := mtest.CreateCursorResponse(0, oCollName, mtest.NextBatch)
+				mt.AddMockResponses(find, killCursors)
+			},
+			wantErr: nil,
+			wantLen: 1,
+		},
+		{
+			name:   "NoData",
+			limit:  10,
+			offset: 0,
 			mock: func(mt *mtest.T) {
 				find := mtest.CreateCursorResponse(1, oCollName, mtest.FirstBatch)
 				mt.AddMockResponses(find)
@@ -462,7 +480,7 @@ func TestOrdersRepoGetAll(t *testing.T) {
 				t.Errorf("failed to create repo")
 				return
 			}
-			results, err := repo.GetAll(context.TODO(), tt.limit)
+			results, err := repo.GetAll(context.TODO(), tt.offset, tt.limit)
 			if tt.wantErr != nil {
 				require.Error(t, err)
 				assert.Equal(t, tt.wantErr, err)

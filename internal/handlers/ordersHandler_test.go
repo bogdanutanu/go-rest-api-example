@@ -217,7 +217,8 @@ func TestOrdersHandler_GetAll(t *testing.T) {
 	tests := []struct {
 		name           string
 		limit          string
-		mockGetAllFunc func(context.Context, int64) (*[]data.Order, error)
+		page           string
+		mockGetAllFunc func(context.Context, int64, int64) (*[]data.Order, error)
 		expectedCode   int
 		expectedError  *external.APIError
 		expectedLength int
@@ -225,7 +226,7 @@ func TestOrdersHandler_GetAll(t *testing.T) {
 		{
 			name:  "Success",
 			limit: "10",
-			mockGetAllFunc: func(_ context.Context, _ int64) (*[]data.Order, error) {
+			mockGetAllFunc: func(_ context.Context, _ int64, _ int64) (*[]data.Order, error) {
 				dataBytes, err := os.ReadFile("../mockData/orders.json")
 				if err != nil {
 					return nil, err
@@ -237,9 +238,20 @@ func TestOrdersHandler_GetAll(t *testing.T) {
 			expectedLength: 10,
 		},
 		{
+			name:  "Success with page",
+			limit: "10",
+			page:  "2",
+			mockGetAllFunc: func(_ context.Context, _ int64, _ int64) (*[]data.Order, error) {
+				results := make([]data.Order, 5)
+				return &results, nil
+			},
+			expectedCode:   http.StatusOK,
+			expectedLength: 5,
+		},
+		{
 			name:  "DB Read Failure",
 			limit: "10",
-			mockGetAllFunc: func(_ context.Context, _ int64) (*[]data.Order, error) {
+			mockGetAllFunc: func(_ context.Context, _ int64, _ int64) (*[]data.Order, error) {
 				return nil, errors.New("db error")
 			},
 			expectedCode: http.StatusInternalServerError,
@@ -251,7 +263,7 @@ func TestOrdersHandler_GetAll(t *testing.T) {
 		{
 			name:  "Limit Out of Bounds",
 			limit: "10000",
-			mockGetAllFunc: func(_ context.Context, _ int64) (*[]data.Order, error) {
+			mockGetAllFunc: func(_ context.Context, _ int64, _ int64) (*[]data.Order, error) {
 				results := make([]data.Order, 10)
 				return &results, nil
 			},
@@ -264,7 +276,7 @@ func TestOrdersHandler_GetAll(t *testing.T) {
 		{
 			name:  "Invalid Limit",
 			limit: "ABC",
-			mockGetAllFunc: func(_ context.Context, _ int64) (*[]data.Order, error) {
+			mockGetAllFunc: func(_ context.Context, _ int64, _ int64) (*[]data.Order, error) {
 				results := make([]data.Order, 10)
 				return &results, nil
 			},
@@ -272,6 +284,34 @@ func TestOrdersHandler_GetAll(t *testing.T) {
 			expectedError: &external.APIError{
 				HTTPStatusCode: http.StatusBadRequest,
 				Message:        "Integer value within 1 and 100 is expected for limit query param",
+			},
+		},
+		{
+			name:  "Invalid Page",
+			limit: "10",
+			page:  "0",
+			mockGetAllFunc: func(_ context.Context, _ int64, _ int64) (*[]data.Order, error) {
+				results := make([]data.Order, 10)
+				return &results, nil
+			},
+			expectedCode: http.StatusBadRequest,
+			expectedError: &external.APIError{
+				HTTPStatusCode: http.StatusBadRequest,
+				Message:        "Integer value greater than or equal to 1 is expected for page query param",
+			},
+		},
+		{
+			name:  "Non-numeric Page",
+			limit: "10",
+			page:  "ABC",
+			mockGetAllFunc: func(_ context.Context, _ int64, _ int64) (*[]data.Order, error) {
+				results := make([]data.Order, 10)
+				return &results, nil
+			},
+			expectedCode: http.StatusBadRequest,
+			expectedError: &external.APIError{
+				HTTPStatusCode: http.StatusBadRequest,
+				Message:        "Integer value greater than or equal to 1 is expected for page query param",
 			},
 		},
 	}
@@ -293,6 +333,9 @@ func TestOrdersHandler_GetAll(t *testing.T) {
 			c.Request, _ = http.NewRequest(http.MethodGet, "/orders", nil)
 			q := c.Request.URL.Query()
 			q.Add("limit", tt.limit)
+			if tt.page != "" {
+				q.Add("page", tt.page)
+			}
 			c.Request.URL.RawQuery = q.Encode()
 
 			r.ServeHTTP(recorder, c.Request)

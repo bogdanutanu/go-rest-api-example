@@ -85,13 +85,13 @@ func (o *OrdersHandler) Create(c *gin.Context) {
 // GetAll handles GET /orders.
 func (o *OrdersHandler) GetAll(c *gin.Context) {
 	lgr, requestID := o.logger.WithReqID(c)
-	limit, apiErr := o.parseLimitQueryParam(c)
+	limit, offset, apiErr := o.parsePaginationParams(c)
 	if apiErr != nil {
 		c.AbortWithStatusJSON(apiErr.HTTPStatusCode, apiErr)
 		return
 	}
 
-	orders, err := o.oDataSvc.GetAll(c, limit)
+	orders, err := o.oDataSvc.GetAll(c, offset, limit)
 	if err != nil {
 		o.abortWithAPIError(c, lgr, http.StatusInternalServerError, errors.OrdersGetServerError,
 			errors.UnexpectedErrorMessage, requestID, err)
@@ -159,28 +159,44 @@ func (o *OrdersHandler) DeleteByID(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// parseLimitQueryParam parses and validates the "limit" query parameter.
-func (o *OrdersHandler) parseLimitQueryParam(c *gin.Context) (int64, *external.APIError) {
+// parsePaginationParams parses and validates the "limit" and "page" query parameters,
+// returning the limit and the calculated offset.
+func (o *OrdersHandler) parsePaginationParams(c *gin.Context) (limit int64, offset int64, apiErr *external.APIError) {
 	lgr, requestID := o.logger.WithReqID(c)
+
 	l := db.DefaultPageSize
 	if input, exists := c.GetQuery("limit"); exists && input != "" {
 		val, err := strconv.Atoi(input)
 		if err != nil || val < 1 || val > MaxPageSize {
-			apiErr := &external.APIError{
+			apiErr = &external.APIError{
 				HTTPStatusCode: http.StatusBadRequest,
-				ErrorCode:      "",
 				Message:        fmt.Sprintf("Integer value within 1 and %d is expected for limit query param", MaxPageSize),
 				DebugID:        requestID,
 			}
-			lgr.Error().
-				Int("HttpStatusCode", apiErr.HTTPStatusCode).
-				Str("ErrorCode", apiErr.ErrorCode).
-				Msg(apiErr.Message)
-			return 0, apiErr
+			lgr.Error().Int("HttpStatusCode", apiErr.HTTPStatusCode).Msg(apiErr.Message)
+			return 0, 0, apiErr
 		}
 		l = val
 	}
-	return int64(l), nil
+
+	p := 1
+	if input, exists := c.GetQuery("page"); exists && input != "" {
+		val, err := strconv.Atoi(input)
+		if err != nil || val < 1 {
+			apiErr = &external.APIError{
+				HTTPStatusCode: http.StatusBadRequest,
+				Message:        "Integer value greater than or equal to 1 is expected for page query param",
+				DebugID:        requestID,
+			}
+			lgr.Error().Int("HttpStatusCode", apiErr.HTTPStatusCode).Msg(apiErr.Message)
+			return 0, 0, apiErr
+		}
+		p = val
+	}
+
+	limit = int64(l)
+	offset = int64(p-1) * limit
+	return limit, offset, nil
 }
 
 // abortWithAPIError logs and aborts the request with a standardized API error response.

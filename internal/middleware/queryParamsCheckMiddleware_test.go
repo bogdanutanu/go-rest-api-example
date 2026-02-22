@@ -28,7 +28,7 @@ func TestQueryParamsCheckMiddleware_ValidParams(t *testing.T) {
 	c.Request, _ = http.NewRequest(http.MethodGet, reqURL, nil)
 	q := c.Request.URL.Query()
 	q.Add("limit", "10")
-	q.Add("offset", "5")
+	q.Add("page", "2")
 	c.Request.URL.RawQuery = q.Encode()
 	r.ServeHTTP(resp, c.Request)
 
