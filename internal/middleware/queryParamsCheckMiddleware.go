@@ -9,8 +9,8 @@ import (
 )
 
 var GetOrdersListReqParams = map[string]bool{
-	"limit":  true,
-	"offset": true,
+	"limit": true,
+	"page":  true,
 }
 
 var AllowedQueryParams = map[string]map[string]bool{

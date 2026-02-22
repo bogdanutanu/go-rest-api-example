@@ -35,7 +35,7 @@ var (
 type OrdersDataService interface {
 	Create(ctx context.Context, purchaseOrder *data.Order) (string, error)
 	Update(ctx context.Context, purchaseOrder *data.Order) error
-	GetAll(ctx context.Context, limit int64) (*[]data.Order, error)
+	GetAll(ctx context.Context, offset, limit int64) (*[]data.Order, error)
 	GetByID(ctx context.Context, id primitive.ObjectID) (*data.Order, error)
 	DeleteByID(ctx context.Context, id primitive.ObjectID) error
 }
@@ -104,12 +104,12 @@ func (o *OrdersRepo) Update(ctx context.Context, po *data.Order) error {
 	return nil
 }
 
-// GetAll retrieves all orders up to the specified limit.
-func (o *OrdersRepo) GetAll(ctx context.Context, limit int64) (*[]data.Order, error) {
+// GetAll retrieves all orders up to the specified limit, starting at the given offset.
+func (o *OrdersRepo) GetAll(ctx context.Context, offset, limit int64) (*[]data.Order, error) {
 	if err := validateCollection(o.collection); err != nil {
 		return nil, err
 	}
-	findOptions := options.Find().SetLimit(limit)
+	findOptions := options.Find().SetLimit(limit).SetSkip(offset)
 	cursor, err := o.collection.Find(ctx, bson.M{}, findOptions)
 	if err != nil {
 		o.logger.Error().Err(err).Msg("failed to find orders")
