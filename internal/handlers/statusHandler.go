@@ -29,12 +29,10 @@ func NewStatusHandler(lgr logger.Logger, m mongodb.MongoManager) (*StatusHandler
 func (s *StatusHandler) CheckStatus(c *gin.Context) {
 	var code int
 
-	if err := s.dbMgr.Ping(); err == nil {
-		code = http.StatusOK
-	} else {
+	if err := s.dbMgr.Ping(); err != nil {
 		s.lgr.Error().Msg("failed to ping DB")
-		code = http.StatusOK // Return 200 even on DB failures for basic health check
 	}
+	code = http.StatusOK // Return 200 even on DB failures for basic health check
 
 	// Check the status of any other dependencies you may have here
 
